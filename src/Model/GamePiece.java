@@ -48,5 +48,14 @@ public class GamePiece {
     return location;
   }
 
-
+  // Test Method
+  @Override
+  public String toString() {
+    return "GamePiece{" +
+        "pieceType=" + pieceType +
+        ", playerNo=" + playerNo +
+        ", symbol=" + symbol +
+        ", location=" + location +
+        '}';
+  }
 }
