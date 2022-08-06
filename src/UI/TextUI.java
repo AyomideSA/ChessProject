@@ -89,9 +89,16 @@ public class TextUI  {
     return gameBoard[row][column];
   }
 
+  public int[] getNewPosition() {
+    System.out.println("Enter the column and row that you want to move the piece to (letter then number, i.e. a1)");
+    String newPosition = this.in.nextLine().trim();
+    int column = newPosition.charAt(0) - 97; // Converts letters to column index. 97(a) - 97 = 0, 98(b) - 97 = 1 etc. Remember, internal representation is an 8x8 array
+    int row = 8 - Character.getNumericValue(newPosition.charAt(1)); // Converts external row index to internal row index. 8 - 8 = 0, 8 - 7 = 1 .... 0 - 0 = 0
+    return new int[]{row, column};
+  }
+
   public void setGameBoard(GamePiece[][] gameBoard) {
     this.gameBoard = gameBoard;
   }
-
 
 }
