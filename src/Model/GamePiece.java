@@ -48,6 +48,10 @@ public class GamePiece {
     return location;
   }
 
+  public int getPlayerNo() {
+    return playerNo;
+  }
+
   // Test Method
   @Override
   public String toString() {
