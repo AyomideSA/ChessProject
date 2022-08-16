@@ -19,6 +19,8 @@ public class GamePiece {
   private int playerNo;
   private char symbol;
   private Location location;
+  private boolean wasMoved = false;
+  private boolean lastTurnPassant = false;
 
   public GamePiece(PieceType pieceType, int playerNo, Location location) {
     this.pieceType = pieceType;
@@ -62,4 +64,21 @@ public class GamePiece {
         ", location=" + location +
         '}';
   }
+
+  public boolean wasMoved() {
+    return wasMoved;
+  }
+
+  public void setWasMoved(boolean wasMoved) {
+    this.wasMoved = wasMoved;
+  }
+
+  public boolean isLastTurnPassant() {
+    return lastTurnPassant;
+  }
+
+  public void setLastTurnPassant(boolean lastTurnPassant) {
+    this.lastTurnPassant = lastTurnPassant;
+  }
+
 }
