@@ -1,7 +1,5 @@
 package Model;
 
-import java.util.Objects;
-
 /**
  * @author : ayoso
  * @mailto : ayomide.sola-ayodele@ucdconnect.ie
@@ -14,21 +12,19 @@ public class Board {
 
   public Board(GamePieceCollection player1Collection, GamePieceCollection player2Collection) {
     gameBoard = new GamePiece[BOARD_HEIGHT][BOARD_WIDTH];
-    //Set up the board
     initialization(player1Collection, player2Collection);
   }
 
   public void initialization(GamePieceCollection player1Collection, GamePieceCollection player2Collection) {
-    // Sets actual positions on the board
     for (int i = 0; i < BOARD_HEIGHT; i++) {
       for (int j = 0; j < BOARD_WIDTH; j++) {
         gameBoard[i][j] = null;
       }
     }
-    for (GamePiece piece: player1Collection.getPieces().values()) {
+    for (GamePiece piece : player1Collection.getPieces().values()) {
       gameBoard[piece.getLocation().getRow()][piece.getLocation().getColumn()] = piece;
     }
-    for (GamePiece piece: player2Collection.getPieces().values()) {
+    for (GamePiece piece : player2Collection.getPieces().values()) {
       gameBoard[piece.getLocation().getRow()][piece.getLocation().getColumn()] = piece;
     }
   }
@@ -44,9 +40,8 @@ public class Board {
 
   public boolean validMove(Move move) {
     char pieceSymbol = move.getChosenPiece().getSymbol();
-                                                              // TODO condition that checks if move is out of bounds
-                                                              // TODO condition that prevents king from being put into check
-    if ( notPlayersPiece(pieceSymbol, move.getPlayerNo()) || outOfBounds(move)) { // Might just change this line to comparing numbers
+    // TODO condition that prevents king from being put into check
+    if (notPlayersPiece(pieceSymbol, move.getPlayerNo()) || outOfBounds(move)) { // Might just change this line to comparing numbers
       System.out.println("test1");
       return false;
     }
@@ -80,40 +75,43 @@ public class Board {
     int column = pieceLocation.getColumn();
     int rowDestination = move.getLocation().getRow();
     int columnDestination = move.getLocation().getColumn();
-    int rowDiff = rowDestination - row;
-    int columnDiff = columnDestination - column;
+    int rowDifference = rowDestination - row;
+    int columnDifference = columnDestination - column;
     int moveDirection; // One Space Forward
     int[][] captureDirections; // Diagonals
+
     if (move.getPlayerNo() == 1) {
-      moveDirection = -1;
+      moveDirection = -1; // White moves up rows
       captureDirections = new int[][]{
+      // {row_difference, column_difference}
           {-1, -1},
           {-1, 1}
       };
     } else {
-      moveDirection = 1;
+      moveDirection = 1; // black moves down rows
       captureDirections = new int[][]{
           {1, -1},
           {1, 1}
       };
     }
 
-    if (validForwardMovement(rowDiff, columnDiff, !pawn.wasMoved(), moveDirection, rowDestination, columnDestination)) {
+    if (validForwardMovement(rowDifference, columnDifference, pawn.wasMoved(), moveDirection, rowDestination, columnDestination)) {
       return true;
-    } else return validCapture(captureDirections, row, column, rowDiff, columnDiff, rowDestination, columnDestination, move.getPlayerNo());
+    } else
+      return validCapture(captureDirections, row, column, rowDifference, columnDifference, rowDestination, columnDestination, move.getPlayerNo());
   }
 
   private boolean validForwardMovement(int rowDiff, int columnDiff, boolean pawnMoved, int moveDirection, int rowDestination, int columnDestination) {
-    return ((rowDiff == moveDirection && columnDiff == 0) || (pawnMoved && rowDiff == moveDirection*2 && columnDiff == 0)) && Objects.isNull(gameBoard[rowDestination][columnDestination]);
+    return ((rowDiff == moveDirection && columnDiff == 0) // One space forward
+        || (!pawnMoved && rowDiff == moveDirection * 2 && columnDiff == 0)) && !occupied(rowDestination, columnDestination); // Two Spaces forward
   }
 
   private boolean validCapture(int[][] captureDirections, int row, int column, int rowDiff, int columnDiff, int rowDestination, int columnDestination, int playerNo) {
-    for (int[] directions : captureDirections) {
+    for (int[] directions : captureDirections) { // diagonals
       if (directions[0] == rowDiff && directions[1] == columnDiff) {
-        if (!Objects.isNull(gameBoard[rowDestination][columnDestination]) && gameBoard[rowDestination][columnDestination].getPlayerNo() != playerNo) {
-          return true;
-        }
-        if (!Objects.isNull(gameBoard[row][column+directions[1]]) && gameBoard[row][column+directions[1]].isLastTurnPassant() && gameBoard[row][column+directions[1]].getPlayerNo() != playerNo && Objects.isNull(gameBoard[rowDestination][columnDestination])) {
+        if (regularCaptureAllowed(rowDestination, columnDestination, playerNo)
+            || enPassantAllowed(row, column+directions[1], rowDestination, columnDestination, playerNo)) { // column+directions[1] as a space beside current piece being occupied
+                                                                                                                  // is a condition for enPassant
           return true;
         }
       }
@@ -121,6 +119,21 @@ public class Board {
     return false;
   }
 
+  private boolean regularCaptureAllowed(int rowDestination, int columnDestination, int playerNo) {
+    return (occupied(rowDestination, columnDestination)
+        && isOpponentsPiece(playerNo, rowDestination, columnDestination));
+  }
+
+  private boolean enPassantAllowed(int row, int column, int rowDestination, int columnDestination, int playerNo) {
+    return occupied(row, column)
+        && gameBoard[row][column].movedTwoSpaces()
+        && isOpponentsPiece(playerNo, row, column)
+        && !occupied(rowDestination, columnDestination);
+  }
+
+  private boolean isOpponentsPiece(int playerNo, int row, int column) {
+    return gameBoard[row][column].getPlayerNo() != playerNo;
+  }
 
   private boolean validMoveKnight(Move move) {
     Location pieceLocation = move.getChosenPiece().getLocation();
@@ -131,7 +144,8 @@ public class Board {
     int rowDiff = rowDestination - row;
     int columnDiff = columnDestination - column;
 
-    int[][] directions = new int[][] {
+    int[][] directions = new int[][]{
+    // {row_difference, column_difference}
         {-2, 1},
         {-2, -1},
         {2, 1},
@@ -145,12 +159,10 @@ public class Board {
     for (int[] direction : directions) {
       if (direction[0] == rowDiff &&
           direction[1] == columnDiff &&
-          (!occupied(rowDestination, columnDestination) || oppositePlayerPiece(rowDestination, columnDestination, move.getPlayerNo())) )  {
+          (!occupied(rowDestination, columnDestination) || oppositePlayerPiece(rowDestination, columnDestination, move.getPlayerNo()))) {
         return true;
       }
     }
-
-    System.out.println("testKnight");
     return false;
   }
 
@@ -163,15 +175,16 @@ public class Board {
     int rowDiff = rowDestination - row;
     int columnDiff = columnDestination - column;
 
-    int[][] directions = new int[][] {
-                 // From White's view
-        {1, -1}, // down left
-        {-1, 1}, // up right
-        {1, 1}, // down right
-        {-1, -1} // up left
+    int[][] directions = new int[][]{
+    //  {row_difference, column_difference}
+        {1, -1},
+        {-1, 1},
+        {1, 1},
+        {-1, -1}
     };
 
-    int directionIndex = -1; // Set to zero just to avoid variable may not be initialized error
+    int directionIndex = -1; // Set to -1 to avoid variable may not be initialized error
+    // Correct direction chosen based on sign of row and column differences
     if (rowDiff > 0 && columnDiff < 0) {
       directionIndex = 0;
     } else if (rowDiff < 0 && columnDiff > 0) {
@@ -183,17 +196,16 @@ public class Board {
     }
 
     int rowOffset = directions[directionIndex][0];
-    int columnOffset= directions[directionIndex][1];
+    int columnOffset = directions[directionIndex][1];
 
-    while ( (row + rowOffset) != rowDestination && (column + columnOffset) != columnDestination) { // Only checks cells on path to player move
+    while ((row + rowOffset) != rowDestination && (column + columnOffset) != columnDestination) { // Only checks cells ON PATH to player move
       row += rowOffset;
       column += columnOffset;
-      if (gameBoard[row][column] != null) {
+      if (occupied(row,column)) {
         return false;
       }
     }
 
-    System.out.println("testBishop");
     return true;
   }
 
@@ -206,15 +218,16 @@ public class Board {
     int rowDiff = rowDestination - row;
     int columnDiff = columnDestination - column;
 
-    int[][] directions = new int[][] {
-        // From White's view
-        {0, -1}, // left
-        {0, 1}, // right
-        {-1, 0}, // up
-        {1, 0} // down
+    int[][] directions = new int[][]{
+    // {row_difference, column_difference}
+        {0, -1},
+        {0, 1},
+        {-1, 0},
+        {1, 0}
     };
 
-    int directionIndex = -1; // Set to zero just to avoid variable may not be initialized error
+    // Correct direction chosen based on sign of row and column differences
+    int directionIndex = -1; // Set to -1 just to avoid variable may not be initialized error
     if (columnDiff < 0) {
       directionIndex = 0;
     } else if (columnDiff > 0) {
@@ -226,17 +239,16 @@ public class Board {
     }
 
     int rowOffset = directions[directionIndex][0];
-    int columnOffset= directions[directionIndex][1];
+    int columnOffset = directions[directionIndex][1];
 
-    while ( (row + rowOffset) != rowDestination && (column + columnOffset) != columnDestination) { // Only checks cells on path to player move
+    while ((row + rowOffset) != rowDestination && (column + columnOffset) != columnDestination) { // Only checks cells on path to player move
       row += rowOffset;
       column += columnOffset;
-      if (gameBoard[row][column] != null) {
+      if (occupied(row, column)) {
         return false;
       }
     }
 
-    System.out.println("testRook");
     return true;
   }
 
@@ -254,7 +266,7 @@ public class Board {
 
   private boolean notPlayersPiece(char pieceSymbol, int playerNo) {
     return Character.isUpperCase(pieceSymbol) && playerNo != 1 ||
-           Character.isLowerCase(pieceSymbol) && playerNo != 2;
+        Character.isLowerCase(pieceSymbol) && playerNo != 2;
   }
 
   private boolean occupied(int row, int column) {
