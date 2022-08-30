@@ -1,5 +1,7 @@
 package Model;
 
+import java.util.Objects;
+
 /**
  * @author : ayoso
  * @mailto : ayomide.sola-ayodele@ucdconnect.ie
@@ -16,11 +18,6 @@ public class Board {
   }
 
   public void initialization(GamePieceCollection player1Collection, GamePieceCollection player2Collection) {
-    for (int i = 0; i < BOARD_HEIGHT; i++) {
-      for (int j = 0; j < BOARD_WIDTH; j++) {
-        gameBoard[i][j] = null;
-      }
-    }
     for (GamePiece piece : player1Collection.getPieces().values()) {
       gameBoard[piece.getLocation().getRow()][piece.getLocation().getColumn()] = piece;
     }
@@ -31,35 +28,69 @@ public class Board {
 
   public Board() { // for testing;
     gameBoard = new GamePiece[BOARD_HEIGHT][BOARD_WIDTH];
-    for (int i = 0; i < BOARD_HEIGHT; i++) {
-      for (int j = 0; j < BOARD_WIDTH; j++) {
-        gameBoard[i][j] = null;
-      }
-    }
   }
 
   public boolean validMove(Move move) {
-    char pieceSymbol = move.getChosenPiece().getSymbol();
+    GamePiece piece = move.getChosenPiece();
+    int rowDestination = move.getLocation().getRow();
+    int columnDestination = move.getLocation().getColumn();
+    char pieceSymbol = piece.getSymbol();
     // TODO condition that prevents king from being put into check
-    if (notPlayersPiece(pieceSymbol, move.getPlayerNo()) || outOfBounds(move)) { // Might just change this line to comparing numbers
-      System.out.println("test1");
+    if (!occupied(piece.getLocation().getRow(), piece.getLocation().getColumn())
+        || notPlayersPiece(pieceSymbol, move.getPlayerNo()) // Might just change this line to comparing numbers
+        || outOfBounds(move)
+        || occupied(rowDestination, columnDestination) && !oppositePlayerPiece(rowDestination, columnDestination, move.getPlayerNo())) {
       return false;
     }
-    if (characterEqualsIgnoreCase(pieceSymbol, 'n')) {
-      return validMoveKnight(move);
+
+    pieceSymbol = Character.toLowerCase(pieceSymbol);
+    return switch (pieceSymbol) {
+      case 'n' -> validMoveKnight(move);
+      case 'b' -> validMoveBishop(move);
+      case 'r' -> validMoveRook(move);
+      case 'q' -> validMoveBishop(move) || validMoveRook(move);
+      case 'p' ->
+          // TODO Make sure pawn can't move two spaces if there is a piece in its way
+          validMovePawn(move);
+      case 'k' -> validMoveKing(move);
+      default -> false;
+    };
+
+  }
+
+  // TODO implement basic functionality
+  // TODO castling
+  // TODO make tests
+  private boolean validMoveKing(Move move) {
+    int rowDifference = move.getLocation().getRow() - move.getChosenPiece().getLocation().getRow();
+    int columnDifference = move.getLocation().getColumn() - move.getChosenPiece().getLocation().getColumn();
+    int destinationRow = move.getLocation().getRow();
+    int destinationColumn = move.getLocation().getColumn();
+
+    if (Math.abs(rowDifference) > 1 || Math.abs(columnDifference) > 1) {
+      return false;
     }
-    if (characterEqualsIgnoreCase(pieceSymbol, 'b')) {
-      return validMoveBishop(move);
+
+    GamePiece[][] boardCopy = new GamePiece[BOARD_HEIGHT][BOARD_WIDTH];
+
+    // copy of board made to check whether king would be in checkmate or not
+    for (int i = 0; i < boardCopy.length; i++) {
+      for (int j = 0; j < boardCopy[0].length; j++) {
+        if (occupied(i, j)) {
+          boardCopy[i][j] = gameBoard[i][j].clone();
+        }
+      }
     }
-    if (characterEqualsIgnoreCase(pieceSymbol, 'r')) {
-      return validMoveRook(move);
+    boardCopy[destinationRow][destinationColumn] = move.getChosenPiece();
+    if (inCheckmate(destinationRow, destinationColumn, boardCopy)) {
+      return false;
     }
-    if (characterEqualsIgnoreCase(pieceSymbol, 'q')) {
-      return validMoveBishop(move) || validMoveRook(move);
-    }
-    if (characterEqualsIgnoreCase(pieceSymbol, 'p')) {
-      return validMovePawn(move);
-    }
+
+    return true;
+  }
+
+  // TODO
+  private boolean inCheckmate(int destinationRow, int destinationColumn, GamePiece[][] boardCopy) {
     return false;
   }
 
@@ -69,14 +100,6 @@ public class Board {
   }
 
   private boolean validMovePawn(Move move) {
-    Location pieceLocation = move.getChosenPiece().getLocation();
-    GamePiece pawn = move.getChosenPiece();
-    int row = pieceLocation.getRow();
-    int column = pieceLocation.getColumn();
-    int rowDestination = move.getLocation().getRow();
-    int columnDestination = move.getLocation().getColumn();
-    int rowDifference = rowDestination - row;
-    int columnDifference = columnDestination - column;
     int moveDirection; // One Space Forward
     int[][] captureDirections; // Diagonals
 
@@ -95,23 +118,34 @@ public class Board {
       };
     }
 
-    if (validForwardMovement(rowDifference, columnDifference, pawn.wasMoved(), moveDirection, rowDestination, columnDestination)) {
+    if (validForwardMovement(move, moveDirection)) {
       return true;
     } else
-      return validCapture(captureDirections, row, column, rowDifference, columnDifference, rowDestination, columnDestination, move.getPlayerNo());
+      return validCapture(captureDirections, move);
   }
 
-  private boolean validForwardMovement(int rowDiff, int columnDiff, boolean pawnMoved, int moveDirection, int rowDestination, int columnDestination) {
-    return ((rowDiff == moveDirection && columnDiff == 0) // One space forward
-        || (!pawnMoved && rowDiff == moveDirection * 2 && columnDiff == 0)) && !occupied(rowDestination, columnDestination); // Two Spaces forward
+  private boolean validForwardMovement(Move move, int moveDirection) {
+    int rowDifference = move.getLocation().getRow() - move.getChosenPiece().getLocation().getRow();
+    int columnDifference = move.getLocation().getColumn() - move.getChosenPiece().getLocation().getColumn();
+    int destinationRow = move.getLocation().getRow();
+    int destinationColumn = move.getLocation().getColumn();
+
+    return ((rowDifference == moveDirection && columnDifference == 0) // One space forward
+        || (!move.getChosenPiece().wasMoved() && rowDifference == moveDirection * 2 && columnDifference == 0))
+            && !occupied(destinationRow, destinationColumn); // Two Spaces forward
   }
 
-  private boolean validCapture(int[][] captureDirections, int row, int column, int rowDiff, int columnDiff, int rowDestination, int columnDestination, int playerNo) {
+  private boolean validCapture(int[][] captureDirections, Move move) {
+    int rowDifference = move.getLocation().getRow() - move.getChosenPiece().getLocation().getRow();
+    int columnDifference = move.getLocation().getColumn() - move.getChosenPiece().getLocation().getColumn();
+
     for (int[] directions : captureDirections) { // diagonals
-      if (directions[0] == rowDiff && directions[1] == columnDiff) {
-        if (regularCaptureAllowed(rowDestination, columnDestination, playerNo)
-            || enPassantAllowed(row, column+directions[1], rowDestination, columnDestination, playerNo)) { // column+directions[1] as a space beside current piece being occupied
-                                                                                                                  // is a condition for enPassant
+      if (directions[0] == rowDifference && directions[1] == columnDifference) {
+        if (regularCaptureAllowed(move)){
+          return true;
+        }
+        if (enPassantAllowed(move, directions[1])) { // column+directions[1] as a space beside current piece being occupied is a condition for enPassant
+          move.setEnPassant(true);
           return true;
         }
       }
@@ -119,16 +153,19 @@ public class Board {
     return false;
   }
 
-  private boolean regularCaptureAllowed(int rowDestination, int columnDestination, int playerNo) {
-    return (occupied(rowDestination, columnDestination)
-        && isOpponentsPiece(playerNo, rowDestination, columnDestination));
+
+  private boolean regularCaptureAllowed(Move move) {
+    return (occupied(move.getLocation().getRow(), move.getLocation().getColumn())
+        && isOpponentsPiece(move.getPlayerNo(), move.getLocation().getRow(), move.getLocation().getColumn()));
   }
 
-  private boolean enPassantAllowed(int row, int column, int rowDestination, int columnDestination, int playerNo) {
-    return occupied(row, column)
-        && gameBoard[row][column].movedTwoSpaces()
-        && isOpponentsPiece(playerNo, row, column)
-        && !occupied(rowDestination, columnDestination);
+  private boolean enPassantAllowed(Move move, int direction) {
+    int adjacentPieceRow = move.getChosenPiece().getLocation().getRow();
+    int adjacentPieceColumn = move.getChosenPiece().getLocation().getColumn() + direction;
+    return occupied(adjacentPieceRow, adjacentPieceColumn)
+        && gameBoard[adjacentPieceRow][adjacentPieceColumn].movedTwoSpaces()
+        && isOpponentsPiece(move.getPlayerNo(), adjacentPieceRow, adjacentPieceColumn)
+        && !occupied(move.getLocation().getRow(), move.getLocation().getColumn());
   }
 
   private boolean isOpponentsPiece(int playerNo, int row, int column) {
@@ -158,8 +195,7 @@ public class Board {
 
     for (int[] direction : directions) {
       if (direction[0] == rowDiff &&
-          direction[1] == columnDiff &&
-          (!occupied(rowDestination, columnDestination) || oppositePlayerPiece(rowDestination, columnDestination, move.getPlayerNo()))) {
+          direction[1] == columnDiff) {
         return true;
       }
     }
@@ -248,12 +284,39 @@ public class Board {
         return false;
       }
     }
-
     return true;
   }
 
-  private boolean oppositePlayerPiece(int rowDestination, int columnDestination, int playerNu) {
-    return (gameBoard[rowDestination][columnDestination].getPlayerNo() - playerNu) != 0;
+  // TODO implement piece promotion for pawn
+  public void makeMove(Move move) {
+    int newRow = move.getChosenPiece().getLocation().getRow();
+    int newColumn = move.getChosenPiece().getLocation().getColumn();
+    int pieceRow = move.getChosenPiece().getLocation().getRow();
+    int pieceColumn = move.getChosenPiece().getLocation().getColumn();
+    if (move.isEnPassant()) {
+      int opponentPieceDirection;
+      int columnDifference = move.getLocation().getColumn() - newColumn;
+      if (columnDifference > 0) {
+        opponentPieceDirection = 1;
+      } else {
+        opponentPieceDirection = -1;
+      }
+      gameBoard[pieceRow][pieceColumn+opponentPieceDirection] = null;
+      gameBoard[newRow][newColumn] = move.getChosenPiece();
+      gameBoard[pieceRow][pieceColumn] = null;
+      move.getChosenPiece().setLocation(new Location(newRow, newColumn));
+    } else {
+      gameBoard[newRow][newColumn] = move.getChosenPiece();
+      gameBoard[pieceRow][pieceColumn] = null;
+    }
+    if (Math.abs(newRow - pieceRow) == 2) {
+      move.getChosenPiece().setMovedTwoSpaces(true);
+    }
+    move.getChosenPiece().setWasMoved(true);
+  }
+
+  private boolean oppositePlayerPiece(int rowDestination, int columnDestination, int playerNo) {
+    return (gameBoard[rowDestination][columnDestination].getPlayerNo() - playerNo) != 0;
   }
 
   public GamePiece[][] getGameBoard() {
