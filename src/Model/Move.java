@@ -10,11 +10,13 @@ public class Move {
   private GamePiece chosenPiece;
   private int playerNo;
   private Location location;
+  private boolean enPassant;
 
   public Move(GamePiece chosenPiece, int playerNo, Location location) {
     this.chosenPiece = chosenPiece;
     this.playerNo = playerNo;
     this.location = location;
+    this.enPassant = false;
   }
 
   public GamePiece getChosenPiece() {
@@ -29,4 +31,11 @@ public class Move {
     return location;
   }
 
+  public boolean isEnPassant() {
+    return enPassant;
+  }
+
+  public void setEnPassant(boolean enPassant) {
+    this.enPassant = enPassant;
+  }
 }
